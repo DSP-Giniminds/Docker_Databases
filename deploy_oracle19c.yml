@@ -1,0 +1,26 @@
+---
+- name: Oracle XE — Fresh Deployment on 10.10.20.32
+  hosts: oracle_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Oracle XE Deployment Starting"
+          - "  Target : {{ inventory_hostname }}"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: oracle19c
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Oracle XE Deployment Completed Successfully"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
