@@ -1,0 +1,164 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[PRE-CHECK] Docker is running"
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: "[IMAGE] Pull PostgreSQL image"
+  ansible.builtin.command: docker pull {{ postgres_image }}
+  changed_when: true
+
+- name: "[IMAGE] PostgreSQL image ready"
+  ansible.builtin.debug:
+    msg: "Image {{ postgres_image }} is ready"
+
+- name: "[IMAGE] Pull PGAdmin image"
+  ansible.builtin.command: docker pull {{ pgadmin_image }}
+  changed_when: true
+
+- name: "[IMAGE] PGAdmin image ready"
+  ansible.builtin.debug:
+    msg: "Image {{ pgadmin_image }} is ready"
+
+- name: "[NETWORK] Check if pg-network exists"
+  ansible.builtin.command: docker network inspect {{ postgres_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: "[NETWORK] Create pg-network"
+  ansible.builtin.command: >
+    docker network create --driver bridge {{ postgres_network }}
+  when: network_check.rc != 0
+
+- name: "[NETWORK] pg-network is ready"
+  ansible.builtin.debug:
+    msg: "Network {{ postgres_network }} is ready"
+
+- name: "[VOLUME] Create PostgreSQL data volume"
+  ansible.builtin.command: docker volume create {{ postgres_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: "[VOLUME] Volume is ready"
+  ansible.builtin.debug:
+    msg: "Volume {{ postgres_volume }} is ready"
+
+- name: "[CLEANUP] Remove existing PostgreSQL container"
+  ansible.builtin.command: docker rm -f {{ postgres_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[CLEANUP] Remove existing PGAdmin container"
+  ansible.builtin.command: docker rm -f {{ pgadmin_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start PostgreSQL container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ postgres_container }}
+    --restart always
+    --shm-size={{ postgres_shm_size }}
+    --network {{ postgres_network }}
+    -e POSTGRES_USER={{ postgres_user }}
+    -e POSTGRES_PASSWORD={{ postgres_password }}
+    -e POSTGRES_DB={{ postgres_db }}
+    -e PGDATA={{ postgres_data_path }}
+    -p {{ postgres_port }}:5432
+    -v {{ postgres_volume }}:/var/lib/postgresql
+    {{ postgres_image }}
+    postgres
+    -c wal_level=logical
+    -c max_replication_slots=10
+    -c max_wal_senders=10
+    -c wal_sender_timeout=0
+  register: postgres_start
+
+- name: "[DEPLOY] PostgreSQL container started"
+  ansible.builtin.debug:
+    msg: "PostgreSQL started → ID: {{ postgres_start.stdout[:12] }}"
+
+- name: "[WAIT] Wait for PostgreSQL port 5050"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ postgres_port }}"
+    delay: "{{ postgres_start_delay }}"
+    timeout: "{{ postgres_start_timeout }}"
+    state: started
+
+- name: "[WAIT] Port 5050 is ready"
+  ansible.builtin.debug:
+    msg: "PostgreSQL port 5050 is open"
+
+- name: "[VERIFY] Check PostgreSQL is healthy"
+  ansible.builtin.command: >
+    docker exec {{ postgres_container }}
+    pg_isready -U {{ postgres_user }} -d {{ postgres_db }}
+  register: pg_ready
+  changed_when: false
+  retries: 5
+  delay: 5
+  until: pg_ready.rc == 0
+
+- name: "[VERIFY] PostgreSQL health"
+  ansible.builtin.debug:
+    msg: "{{ pg_ready.stdout }}"
+
+- name: "[PGADMIN] Start PGAdmin container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ pgadmin_container }}
+    --restart always
+    --network {{ postgres_network }}
+    -e PGADMIN_DEFAULT_EMAIL={{ pgadmin_email }}
+    -e PGADMIN_DEFAULT_PASSWORD={{ pgadmin_password }}
+    -e PGADMIN_CONFIG_SERVER_MODE=False
+    -e PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    -p {{ pgadmin_port }}:80
+    {{ pgadmin_image }}
+  register: pgadmin_start
+
+- name: "[PGADMIN] PGAdmin started"
+  ansible.builtin.debug:
+    msg: "PGAdmin started → ID: {{ pgadmin_start.stdout[:12] }}"
+
+- name: "[PGADMIN] Wait for PGAdmin port 8888"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ pgadmin_port }}"
+    delay: 10
+    timeout: 60
+    state: started
+
+- name: "[VERIFY] Check all containers running"
+  ansible.builtin.command: docker ps --filter name={{ postgres_container }} --filter name={{ pgadmin_container }}
+  register: final_check
+  changed_when: false
+
+- name: "[VERIFY] Show running containers"
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: "[DONE] PostgreSQL Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  PostgreSQL 18 Deployment Complete"
+      - "======================================================="
+      - "  Server    : 10.10.20.32 (ginicoeapp01)"
+      - "  Container : {{ postgres_container }}"
+      - "  Image     : {{ postgres_image }}"
+      - "  Database  : {{ postgres_db }}"
+      - "  Port      : 5050"
+      - "  User      : {{ postgres_user }}"
+      - "  Password  : {{ postgres_password }}"
+      - "-------------------------------------------------------"
+      - "  PGAdmin   : http://10.10.20.32:{{ pgadmin_port }}"
+      - "  Login     : {{ pgadmin_email }} / {{ pgadmin_password }}"
+      - "======================================================="

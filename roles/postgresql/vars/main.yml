@@ -1,0 +1,18 @@
+---
+postgres_image:       "postgres:18-alpine"
+postgres_container:   "postgres-db"
+postgres_port:        "5050"
+postgres_user:        "postgres"
+postgres_password:    "postgres@123"
+postgres_db:          "testdb"
+postgres_data_path:   "/var/lib/postgresql/18/docker"
+postgres_volume:      "postgres_data"
+postgres_network:     "pg-network"
+postgres_shm_size:    "256mb"
+pgadmin_image:        "dpage/pgadmin4:latest"
+pgadmin_container:    "pgadmin-ui"
+pgadmin_port:         "8888"
+pgadmin_email:        "admin@example.com"
+pgadmin_password:     "adminpassword"
+postgres_start_delay:   10
+postgres_start_timeout: 120
