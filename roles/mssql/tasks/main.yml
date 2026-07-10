@@ -1,0 +1,124 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[PRE-CHECK] Docker is running"
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: "[IMAGE] Pull MSSQL 2022 image"
+  ansible.builtin.command: docker pull {{ mssql_image }}
+  changed_when: true
+
+- name: "[IMAGE] MSSQL image ready"
+  ansible.builtin.debug:
+    msg: "Image {{ mssql_image }} is ready"
+
+- name: "[NETWORK] Check if mssql_network exists"
+  ansible.builtin.command: docker network inspect {{ mssql_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: "[NETWORK] Create mssql_network"
+  ansible.builtin.command: >
+    docker network create --driver bridge {{ mssql_network }}
+  when: network_check.rc != 0
+
+- name: "[NETWORK] mssql_network is ready"
+  ansible.builtin.debug:
+    msg: "Network {{ mssql_network }} is ready"
+
+- name: "[VOLUME] Create MSSQL data volume"
+  ansible.builtin.command: docker volume create {{ mssql_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: "[VOLUME] Volume is ready"
+  ansible.builtin.debug:
+    msg: "Volume {{ mssql_volume }} is ready"
+
+- name: "[CLEANUP] Remove existing MSSQL container"
+  ansible.builtin.command: docker rm -f {{ mssql_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start MSSQL 2022 container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ mssql_container }}
+    --restart always
+    --network {{ mssql_network }}
+    -e ACCEPT_EULA=Y
+    -e SA_PASSWORD={{ mssql_sa_password }}
+    -e MSSQL_PID={{ mssql_pid }}
+    -p {{ mssql_port }}:1433
+    -v {{ mssql_volume }}:/var/opt/mssql
+    {{ mssql_image }}
+  register: mssql_start
+
+- name: "[DEPLOY] MSSQL container started"
+  ansible.builtin.debug:
+    msg: "MSSQL started → ID: {{ mssql_start.stdout[:12] }}"
+
+- name: "[WAIT] Wait for MSSQL port 1433"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ mssql_port }}"
+    delay: "{{ mssql_start_delay }}"
+    timeout: "{{ mssql_start_timeout }}"
+    state: started
+
+- name: "[WAIT] Port 1433 is ready"
+  ansible.builtin.debug:
+    msg: "MSSQL port 1433 is open and ready"
+
+- name: "[VERIFY] Check MSSQL is responding"
+  ansible.builtin.command: >
+    docker exec {{ mssql_container }}
+    /opt/mssql-tools18/bin/sqlcmd
+    -S localhost
+    -U SA
+    -P {{ mssql_sa_password }}
+    -Q "SELECT 'MSSQL is UP' AS STATUS"
+    -No
+  register: mssql_check
+  changed_when: false
+  retries: 5
+  delay: 10
+  until: mssql_check.rc == 0
+  ignore_errors: true
+
+- name: "[VERIFY] Show MSSQL health"
+  ansible.builtin.debug:
+    msg: "{{ mssql_check.stdout_lines }}"
+
+- name: "[VERIFY] Check MSSQL container running"
+  ansible.builtin.command: docker ps --filter name={{ mssql_container }}
+  register: final_check
+  changed_when: false
+
+- name: "[VERIFY] Show container status"
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: "[DONE] MSSQL Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  MS SQL Server 2022 Deployment Complete"
+      - "======================================================="
+      - "  Server      : 10.10.20.32 (ginicoeapp01)"
+      - "  Container   : {{ mssql_container }}"
+      - "  Image       : {{ mssql_image }}"
+      - "  Port        : {{ mssql_port }}"
+      - "  SA Password : {{ mssql_sa_password }}"
+      - "  Volume      : {{ mssql_volume }}"
+      - "  Network     : {{ mssql_network }}"
+      - "-------------------------------------------------------"
+      - "  Connect:"
+      - "  docker exec -it {{ mssql_container }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P {{ mssql_sa_password }} -No"
+      - "======================================================="
