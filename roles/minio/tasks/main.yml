@@ -1,0 +1,113 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[PRE-CHECK] Docker is running"
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: "[IMAGE] Pull MinIO image"
+  ansible.builtin.command: docker pull {{ minio_image }}
+  changed_when: true
+
+- name: "[IMAGE] MinIO image ready"
+  ansible.builtin.debug:
+    msg: "Image {{ minio_image }} is ready"
+
+- name: "[NETWORK] Check if minio_network exists"
+  ansible.builtin.command: docker network inspect {{ minio_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: "[NETWORK] Create minio_network"
+  ansible.builtin.command: >
+    docker network create --driver bridge {{ minio_network }}
+  when: network_check.rc != 0
+
+- name: "[NETWORK] minio_network is ready"
+  ansible.builtin.debug:
+    msg: "Network {{ minio_network }} is ready"
+
+- name: "[VOLUME] Create MinIO data volume"
+  ansible.builtin.command: docker volume create {{ minio_data_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: "[VOLUME] Volume is ready"
+  ansible.builtin.debug:
+    msg: "Volume {{ minio_data_volume }} is ready"
+
+- name: "[CLEANUP] Remove existing MinIO container"
+  ansible.builtin.command: docker rm -f {{ minio_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start MinIO container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ minio_container }}
+    --restart always
+    --network {{ minio_network }}
+    -p {{ minio_api_port }}:9000
+    -p {{ minio_console_port }}:9001
+    -v {{ minio_data_volume }}:/data
+    -e MINIO_ROOT_USER={{ minio_root_user }}
+    -e MINIO_ROOT_PASSWORD={{ minio_root_password }}
+    {{ minio_image }}
+    server /data --console-address ":9001"
+  register: minio_start
+
+- name: "[DEPLOY] MinIO container started"
+  ansible.builtin.debug:
+    msg: "MinIO started → ID: {{ minio_start.stdout[:12] }}"
+
+- name: "[WAIT] Wait for MinIO to initialize"
+  ansible.builtin.pause:
+    seconds: "{{ minio_start_delay }}"
+
+- name: "[VERIFY] Check MinIO health"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ minio_api_port }}/minio/health/live"
+    method: GET
+    status_code: 200
+  register: minio_health
+  retries: 5
+  delay: 5
+  until: minio_health.status == 200
+
+- name: "[VERIFY] MinIO is alive"
+  ansible.builtin.debug:
+    msg: "MinIO health check passed — MinIO ALIVE"
+
+- name: "[VERIFY] Check MinIO container running"
+  ansible.builtin.command: docker ps --filter name={{ minio_container }}
+  register: final_check
+  changed_when: false
+
+- name: "[VERIFY] Show container status"
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: "[DONE] MinIO Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  MinIO Deployment Complete"
+      - "======================================================="
+      - "  Server        : 10.10.20.32 (ginicoeapp01)"
+      - "  Container      : {{ minio_container }}"
+      - "  Image          : {{ minio_image }}"
+      - "  API Port       : {{ minio_api_port }}"
+      - "  Console Port   : {{ minio_console_port }}"
+      - "  Volume         : {{ minio_data_volume }}"
+      - "  Root User      : {{ minio_root_user }}"
+      - "  Root Password  : {{ minio_root_password }}"
+      - "-------------------------------------------------------"
+      - "  MinIO Console  : http://10.10.20.32:{{ minio_console_port }}"
+      - "  MinIO API      : http://10.10.20.32:{{ minio_api_port }}"
+      - "  Login          : {{ minio_root_user }} / {{ minio_root_password }}"
+      - "======================================================="

@@ -1,0 +1,26 @@
+---
+- name: MinIO — Fresh Deployment on Docker
+  hosts: minio_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  MinIO Deployment Starting"
+          - "  Target : 10.10.20.32 (ginicoeapp01)"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: minio
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  MinIO Deployment Completed Successfully"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
