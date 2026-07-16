@@ -1,0 +1,17 @@
+---
+- name: IBM MQ Fresh Deployment
+  hosts: ibmmq_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg: "IBM MQ Deployment Starting on 10.10.20.32"
+
+  roles:
+    - role: ibmmq
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg: "IBM MQ Deployment Completed Successfully"

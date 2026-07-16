@@ -1,0 +1,70 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running"
+
+- name: IMAGE Pull IBM MQ image
+  ansible.builtin.command: docker pull {{ ibmmq_image }}
+  changed_when: true
+
+- name: NETWORK Check network exists
+  ansible.builtin.command: docker network inspect {{ ibmmq_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create network
+  ansible.builtin.command: docker network create --driver bridge {{ ibmmq_network }}
+  when: network_check.rc != 0
+
+- name: VOLUME Create data volume
+  ansible.builtin.command: docker volume create {{ ibmmq_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: CLEANUP Remove old container
+  ansible.builtin.command: docker rm -f {{ ibmmq_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start IBM MQ
+  ansible.builtin.command: docker run -d --name {{ ibmmq_container }} --restart always --network {{ ibmmq_network }} -p {{ ibmmq_mq_port }}:1414 -p {{ ibmmq_console_port }}:9443 -v {{ ibmmq_volume }}:/mnt/mqm -e LICENSE=accept -e MQ_QMGR_NAME={{ ibmmq_queue_manager }} -e MQ_APP_PASSWORD={{ ibmmq_app_password }} -e MQ_ADMIN_PASSWORD={{ ibmmq_admin_password }} {{ ibmmq_image }}
+  register: ibmmq_start
+
+- name: WAIT for port 1414
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ ibmmq_mq_port }}"
+    delay: "{{ ibmmq_start_delay }}"
+    timeout: "{{ ibmmq_start_timeout }}"
+    state: started
+
+- name: WAIT for port 9443
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ ibmmq_console_port }}"
+    delay: 5
+    timeout: 60
+    state: started
+
+- name: VERIFY Check container running
+  ansible.builtin.command: docker ps --filter name={{ ibmmq_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE Summary
+  ansible.builtin.debug:
+    msg:
+      - "IBM MQ Deployment Complete"
+      - "Console: https://10.10.20.32:{{ ibmmq_console_port }}/ibmmq/console"
+      - "Login: admin / {{ ibmmq_admin_password }}"

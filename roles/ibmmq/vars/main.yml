@@ -1,0 +1,12 @@
+---
+ibmmq_image:          "icr.io/ibm-messaging/mq:latest"
+ibmmq_container:      "ibm-mq"
+ibmmq_mq_port:        "1414"
+ibmmq_console_port:   "9443"
+ibmmq_volume:         "ibmmq_data"
+ibmmq_network:        "ibmmq_network"
+ibmmq_queue_manager:  "QM1"
+ibmmq_app_password:   "passw0rd"
+ibmmq_admin_password: "passw0rd"
+ibmmq_start_delay:    30
+ibmmq_start_timeout:  180
