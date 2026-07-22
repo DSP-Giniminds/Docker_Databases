@@ -24,8 +24,8 @@ its complete Ansible scripts, configuration and Jenkinsfile.
 
 ## Deployment
 
-All databases are deployed on Docker on server 10.10.20.32
-and automated through Jenkins running on 10.10.20.48.
+All databases are deployed on Docker 
+and automated through Jenkins.
 
 
 ## Each Branch Contains
