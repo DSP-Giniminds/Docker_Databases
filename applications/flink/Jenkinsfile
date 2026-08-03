@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy Flink') {
+            steps {
+                dir('applications/flink') {
+                    sh 'ansible-playbook -i inventory deploy_flink.yml'
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy ClickHouse') {
+            steps {
+                dir('applications/clickhouse') {
+                    sh 'ansible-playbook -i inventory deploy_clickhouse.yml'
+                }
+            }
+        }
+    }
+}

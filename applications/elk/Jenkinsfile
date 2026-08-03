@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy ELK') {
+            steps {
+                dir('applications/elk') {
+                    sh 'ansible-playbook -i inventory deploy_elk.yml'
+                }
+            }
+        }
+    }
+}
