@@ -3,8 +3,10 @@ pipeline {
     stages {
         stage('Deploy Confluent Flink') {
             steps {
-                dir('applications/confluentflink') {
-                    sh 'ansible-playbook -i inventory deploy_confluentflink.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/Docker_Databases/applications/confluentflink && ansible-playbook -i inventory deploy_confluentflink.yml'
+                    '''
                 }
             }
         }
