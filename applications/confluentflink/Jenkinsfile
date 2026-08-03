@@ -5,7 +5,7 @@ pipeline {
             steps {
                 sshagent(['32_creds']) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/confluentflink_deploy && ansible-playbook -i inventory deploy_confluentflink.yml'
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/confluentflink_deploy && ansible-playbook -i inventory deploy_flink.yml'
                     '''
                 }
             }
