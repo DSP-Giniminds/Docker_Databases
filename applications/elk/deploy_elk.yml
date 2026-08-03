@@ -1,0 +1,27 @@
+---
+- name: ELK Stack — Fresh Deployment
+  hosts: elk_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  ELK Stack Deployment Starting"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: elk
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  ELK Stack Deployment Completed Successfully"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="

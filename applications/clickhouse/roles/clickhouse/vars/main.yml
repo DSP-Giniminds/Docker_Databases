@@ -1,0 +1,15 @@
+---
+# ClickHouse
+clickhouse_image:       "clickhouse/clickhouse-server:latest"
+clickhouse_container:   "clickhouse"
+clickhouse_http_port:   "8123"
+clickhouse_native_port: "9000"
+clickhouse_volume:      "clickhouse_data"
+clickhouse_network:     "clickhouse_network"
+clickhouse_user:        "default"
+clickhouse_password:    "dsp@Click1234"
+clickhouse_db:          "dsp_db"
+
+# Timings
+start_delay:            10
+start_timeout:          120

@@ -1,0 +1,27 @@
+---
+- name: Apache Flink — Fresh Deployment
+  hosts: flink_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Apache Flink Deployment Starting"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: flink
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Apache Flink Deployment Completed Successfully"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="

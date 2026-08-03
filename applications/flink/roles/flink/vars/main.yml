@@ -1,0 +1,16 @@
+---
+# Apache Flink
+flink_image:              "apache/flink:1.18.0"
+flink_network:            "flink_network"
+
+# JobManager
+jobmanager_container:     "flink-jobmanager"
+jobmanager_port:          "8081"
+
+# TaskManager
+taskmanager_container:    "flink-taskmanager"
+taskmanager_slots:        "4"
+
+# Timings
+start_delay:              10
+start_timeout:            120

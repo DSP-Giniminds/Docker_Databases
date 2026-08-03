@@ -1,0 +1,19 @@
+---
+# webMethods Integration Server
+wm_image:           "sagcr.azurecr.io/webmethods-integration-server:10.15"
+wm_container:       "webmethods-is"
+wm_admin_port:      "5555"
+wm_https_port:      "5543"
+wm_volume:          "webmethods_data"
+wm_network:         "webmethods_network"
+wm_admin_password:  "manage"
+
+# TODO: Update these before running
+sag_registry:       "sagcr.azurecr.io"
+sag_username:       "REPLACE_WITH_SAG_USERNAME"
+sag_password:       "REPLACE_WITH_SAG_PASSWORD"
+wm_license_file:    "REPLACE_WITH_LICENSE_FILE_PATH"
+
+# Timings
+start_delay:        30
+start_timeout:      300

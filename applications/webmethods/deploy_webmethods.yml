@@ -1,0 +1,27 @@
+---
+- name: webMethods Integration Server — Fresh Deployment
+  hosts: webmethods_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  webMethods IS Deployment Starting"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: webmethods
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  webMethods IS Deployment Completed Successfully"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="

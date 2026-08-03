@@ -1,0 +1,9 @@
+---
+vault_image:        "hashicorp/vault:latest"
+vault_container:    "vault"
+vault_port:         "8200"
+vault_volume:       "vault_data"
+vault_network:      "vault_network"
+vault_root_token:   "dsp-root-token"
+start_delay:        10
+start_timeout:      60

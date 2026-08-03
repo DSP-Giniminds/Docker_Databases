@@ -1,0 +1,97 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: LOGIN to SAG Container Registry
+  ansible.builtin.command: >
+    docker login {{ sag_registry }}
+    -u {{ sag_username }}
+    -p {{ sag_password }}
+  changed_when: true
+
+- name: IMAGE Pull webMethods IS image
+  ansible.builtin.command: docker pull {{ wm_image }}
+  changed_when: true
+
+- name: IMAGE webMethods image ready
+  ansible.builtin.debug:
+    msg: "Image {{ wm_image }} is ready"
+
+- name: NETWORK Check if webmethods_network exists
+  ansible.builtin.command: docker network inspect {{ wm_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create webmethods_network
+  ansible.builtin.command: docker network create --driver bridge {{ wm_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK webmethods_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ wm_network }} is ready"
+
+- name: VOLUME Create webMethods data volume
+  ansible.builtin.command: docker volume create {{ wm_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: CLEANUP Remove existing webMethods container
+  ansible.builtin.command: docker rm -f {{ wm_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start webMethods IS container
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ wm_container }}
+    --restart always
+    --network {{ wm_network }}
+    -p {{ wm_admin_port }}:5555
+    -p {{ wm_https_port }}:5543
+    -v {{ wm_volume }}:/opt/softwareag/IntegrationServer/instances/default
+    -v {{ wm_license_file }}:/opt/softwareag/IntegrationServer/config/licenseKey.xml:ro
+    -e SAG_IS_ADMINISTRATOR_PASSWORD={{ wm_admin_password }}
+    {{ wm_image }}
+  register: wm_start
+
+- name: DEPLOY webMethods container started
+  ansible.builtin.debug:
+    msg: "webMethods IS started → ID: {{ wm_start.stdout[:12] }}"
+
+- name: WAIT for webMethods Admin port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ wm_admin_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY webMethods is ready
+  ansible.builtin.debug:
+    msg: "webMethods IS port {{ wm_admin_port }} is open and ready"
+
+- name: VERIFY Check container running
+  ansible.builtin.command: docker ps --filter name={{ wm_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE webMethods Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "webMethods IS Deployment Complete"
+      - "Server      : {{ inventory_hostname }} ({{ ansible_host }})"
+      - "Admin UI    : http://{{ ansible_host }}:{{ wm_admin_port }}"
+      - "HTTPS Port  : https://{{ ansible_host }}:{{ wm_https_port }}"
+      - "Password    : {{ wm_admin_password }}"

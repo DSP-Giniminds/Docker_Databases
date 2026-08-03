@@ -1,0 +1,108 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[NETWORK] Ensure ELK Docker network exists"
+  ansible.builtin.shell: docker network create {{ elk_network }} || true
+  changed_when: false
+
+- name: "[VOLUME] Create Elasticsearch volume"
+  ansible.builtin.command: docker volume create {{ elasticsearch_volume }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[IMAGE] Pull ELK Docker Images"
+  ansible.builtin.command: docker pull {{ item }}
+  loop:
+    - "{{ elasticsearch_image }}"
+    - "{{ kibana_image }}"
+    - "{{ logstash_image }}"
+  changed_when: true
+
+- name: "[CLEANUP] Remove existing ELK containers if present"
+  ansible.builtin.command: docker rm -f {{ elasticsearch_container }} {{ kibana_container }} {{ logstash_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start Elasticsearch 8.x Container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ elasticsearch_container }}
+    --restart always
+    --network {{ elk_network }}
+    -p {{ elasticsearch_port }}:9200
+    -v {{ elasticsearch_volume }}:/usr/share/elasticsearch/data
+    -e "discovery.type=single-node"
+    -e "xpack.security.enabled=true"
+    -e "xpack.security.enrollment.enabled=true"
+    -e "xpack.security.http.ssl.enabled=false"
+    -e "ELASTIC_PASSWORD={{ elastic_password }}"
+    {{ elasticsearch_image }}
+  register: elastic_start
+
+- name: "[WAIT] Wait for Elasticsearch TCP port to open"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ elasticsearch_port }}"
+    delay: 15
+    timeout: 120
+    state: started
+
+- name: "[WAIT] Wait for Elasticsearch API to respond with 200 OK"
+  ansible.builtin.command: >
+    docker exec {{ elasticsearch_container }} 
+    curl -s -o /dev/null -w "%{http_code}" -u elastic:{{ elastic_password }} http://localhost:9200/
+  register: es_api_check
+  until: es_api_check.stdout == "200"
+  retries: 20
+  delay: 10
+  changed_when: false
+
+- name: "[SECURITY] Configure kibana_system system user password"
+  ansible.builtin.command: >
+    docker exec {{ elasticsearch_container }} 
+    curl -s -X POST -u elastic:{{ elastic_password }} 
+    "http://localhost:9200/_security/user/kibana_system/_password" 
+    -H "Content-Type: application/json" 
+    -d '{"password":"{{ kibana_system_password }}"}'
+  register: password_set
+  retries: 5
+  delay: 5
+  until: password_set.rc == 0
+
+- name: "[DEPLOY] Start Kibana Container using service user"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ kibana_container }}
+    --restart always
+    --network {{ elk_network }}
+    -p {{ kibana_port }}:5601
+    -e "ELASTICSEARCH_HOSTS=http://{{ elasticsearch_container }}:9200"
+    -e "ELASTICSEARCH_USERNAME=kibana_system"
+    -e "ELASTICSEARCH_PASSWORD={{ kibana_system_password }}"
+    {{ kibana_image }}
+  register: kibana_start
+
+- name: "[WAIT] Wait for Kibana Web UI Port"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ kibana_port }}"
+    delay: 5
+    timeout: 90
+    state: started
+
+- name: "[DONE] ELK Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  ELK Stack Deployment Complete (Fixed Kibana Auth)"
+      - "======================================================="
+      - "  Server          : 10.10.20.32"
+      - "  Elasticsearch   : http://10.10.20.32:{{ elasticsearch_port }}"
+      - "  Kibana Dashboard: http://10.10.20.32:{{ kibana_port }}"
+      - "  Docker Network  : {{ elk_network }}"
+      - "  Kibana Auth User: kibana_system"
+      - "======================================================="

@@ -1,0 +1,24 @@
+elk_network:              "elk_network"
+
+# Elasticsearch
+elasticsearch_image:      "docker.elastic.co/elasticsearch/elasticsearch:8.13.0"
+elasticsearch_container:  "elasticsearch"
+elasticsearch_port:       "9200"
+elasticsearch_volume:     "elasticsearch_data"
+elastic_password:         "dsp@Elastic1"
+kibana_system_password:   "kibana@DSP1234"  # <-- Added to fix the authentication error
+
+# Kibana
+kibana_image:             "docker.elastic.co/kibana/kibana:8.13.0"
+kibana_container:         "kibana"
+kibana_port:              "5601"
+
+# Logstash
+logstash_image:           "docker.elastic.co/logstash/logstash:8.13.0"
+logstash_container:       "logstash"
+logstash_port:            "5044"
+logstash_volume:          "logstash_data"
+
+# Timings
+start_delay:              20
+start_timeout:            300

@@ -1,0 +1,17 @@
+---
+- name: HashiCorp Vault — Fresh Deployment
+  hosts: vault_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg: "HashiCorp Vault Deployment Starting on 10.10.20.32"
+
+  roles:
+    - role: vault
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg: "HashiCorp Vault Deployment Completed Successfully"

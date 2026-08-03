@@ -1,0 +1,109 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: IMAGE Pull ClickHouse image
+  ansible.builtin.command: docker pull {{ clickhouse_image }}
+  changed_when: true
+
+- name: IMAGE ClickHouse image ready
+  ansible.builtin.debug:
+    msg: "Image {{ clickhouse_image }} is ready"
+
+- name: NETWORK Check if clickhouse_network exists
+  ansible.builtin.command: docker network inspect {{ clickhouse_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create clickhouse_network
+  ansible.builtin.command: docker network create --driver bridge {{ clickhouse_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK clickhouse_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ clickhouse_network }} is ready"
+
+- name: VOLUME Create ClickHouse data volume
+  ansible.builtin.command: docker volume create {{ clickhouse_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: VOLUME ClickHouse data volume is ready
+  ansible.builtin.debug:
+    msg: "Volume {{ clickhouse_volume }} is ready"
+
+- name: CLEANUP Remove existing ClickHouse container
+  ansible.builtin.command: docker rm -f {{ clickhouse_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start ClickHouse container
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ clickhouse_container }}
+    --restart always
+    --network {{ clickhouse_network }}
+    -p {{ clickhouse_http_port }}:8123
+    -p 9900:9000
+    -v {{ clickhouse_volume }}:/var/lib/clickhouse
+    -e CLICKHOUSE_USER={{ clickhouse_user }}
+    -e CLICKHOUSE_PASSWORD={{ clickhouse_password }}
+    -e CLICKHOUSE_DB={{ clickhouse_db }}
+    {{ clickhouse_image }}
+  register: clickhouse_start
+
+- name: DEPLOY ClickHouse container started
+  ansible.builtin.debug:
+    msg: "ClickHouse started → ID: {{ clickhouse_start.stdout[:12] }}"
+
+- name: WAIT for ClickHouse HTTP port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ clickhouse_http_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY ClickHouse health check
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ clickhouse_http_port }}/ping"
+    method: GET
+    status_code: 200
+  register: ch_health
+  retries: 5
+  delay: 5
+  until: ch_health.status == 200
+
+- name: VERIFY ClickHouse is healthy
+  ansible.builtin.debug:
+    msg: "ClickHouse is UP and healthy"
+
+- name: VERIFY Check container running
+  ansible.builtin.command: >
+    docker ps --filter name={{ clickhouse_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE ClickHouse Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "ClickHouse Deployment Complete"
+      - "Server      : {{ inventory_hostname }} ({{ ansible_host }})"
+      - "HTTP Port   : http://{{ ansible_host }}:{{ clickhouse_http_port }}"
+      - "Native Port : {{ ansible_host }}:9900"
+      - "Database    : {{ clickhouse_db }}"
+      - "User        : {{ clickhouse_user }}"
+      - "Password    : {{ clickhouse_password }}"
+      - "Ping Check  : http://{{ ansible_host }}:{{ clickhouse_http_port }}/ping"

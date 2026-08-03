@@ -1,0 +1,93 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running"
+
+- name: IMAGE Pull Vault image
+  ansible.builtin.command: docker pull {{ vault_image }}
+  changed_when: true
+
+- name: IMAGE Vault image ready
+  ansible.builtin.debug:
+    msg: "Image {{ vault_image }} is ready"
+
+- name: NETWORK Check if vault_network exists
+  ansible.builtin.command: docker network inspect {{ vault_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create vault_network
+  ansible.builtin.command: docker network create --driver bridge {{ vault_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK vault_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ vault_network }} is ready"
+
+- name: VOLUME Create Vault data volume
+  ansible.builtin.command: docker volume create {{ vault_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: VOLUME Vault data volume is ready
+  ansible.builtin.debug:
+    msg: "Volume {{ vault_volume }} is ready"
+
+- name: CLEANUP Remove existing Vault container
+  ansible.builtin.command: docker rm -f {{ vault_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start Vault container
+  ansible.builtin.command: docker run -d --name {{ vault_container }} --restart always --network {{ vault_network }} -p {{ vault_port }}:8200 -v {{ vault_volume }}:/vault/data -e VAULT_DEV_ROOT_TOKEN_ID={{ vault_root_token }} -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 --cap-add IPC_LOCK {{ vault_image }} server -dev
+  register: vault_start
+
+- name: DEPLOY Vault container started
+  ansible.builtin.debug:
+    msg: "Vault started → ID: {{ vault_start.stdout[:12] }}"
+
+- name: WAIT for Vault port 8200
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ vault_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY Vault health check
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vault_port }}/v1/sys/health"
+    method: GET
+    status_code: [200, 429, 472, 473, 501, 503]
+  register: vault_health
+  retries: 5
+  delay: 5
+  until: vault_health.status in [200, 429, 472, 473, 501, 503]
+
+- name: VERIFY Vault is healthy
+  ansible.builtin.debug:
+    msg: "Vault is UP and healthy"
+
+- name: VERIFY Check container running
+  ansible.builtin.command: docker ps --filter name={{ vault_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE Vault Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "HashiCorp Vault Deployment Complete"
+      - "Vault UI    : http://10.10.20.32:{{ vault_port }}"
+      - "Root Token  : {{ vault_root_token }}"
+      - "Login       : Token → {{ vault_root_token }}"

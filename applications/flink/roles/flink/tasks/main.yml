@@ -1,0 +1,106 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: IMAGE Pull Apache Flink image
+  ansible.builtin.command: docker pull {{ flink_image }}
+  changed_when: true
+
+- name: IMAGE Apache Flink image ready
+  ansible.builtin.debug:
+    msg: "Image {{ flink_image }} is ready"
+
+- name: NETWORK Check if flink_network exists
+  ansible.builtin.command: docker network inspect {{ flink_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create flink_network
+  ansible.builtin.command: docker network create --driver bridge {{ flink_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK flink_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ flink_network }} is ready"
+
+- name: CLEANUP Remove existing JobManager container
+  ansible.builtin.command: docker rm -f {{ jobmanager_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: CLEANUP Remove existing TaskManager container
+  ansible.builtin.command: docker rm -f {{ taskmanager_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start Flink JobManager
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ jobmanager_container }}
+    --restart always
+    --network {{ flink_network }}
+    -p {{ jobmanager_port }}:8081
+    -e FLINK_PROPERTIES="jobmanager.rpc.address: {{ jobmanager_container }}"
+    {{ flink_image }}
+    jobmanager
+  register: jobmanager_start
+
+- name: DEPLOY JobManager started
+  ansible.builtin.debug:
+    msg: "Flink JobManager started → ID: {{ jobmanager_start.stdout[:12] }}"
+
+- name: WAIT for JobManager port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ jobmanager_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY JobManager is ready
+  ansible.builtin.debug:
+    msg: "Flink JobManager port {{ jobmanager_port }} is open and ready"
+
+- name: DEPLOY Start Flink TaskManager
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ taskmanager_container }}
+    --restart always
+    --network {{ flink_network }}
+    -e FLINK_PROPERTIES="jobmanager.rpc.address: {{ jobmanager_container }}
+    taskmanager.numberOfTaskSlots: {{ taskmanager_slots }}"
+    {{ flink_image }}
+    taskmanager
+  register: taskmanager_start
+
+- name: DEPLOY TaskManager started
+  ansible.builtin.debug:
+    msg: "Flink TaskManager started → ID: {{ taskmanager_start.stdout[:12] }}"
+
+- name: VERIFY Check all containers running
+  ansible.builtin.command: >
+    docker ps
+    --filter name={{ jobmanager_container }}
+    --filter name={{ taskmanager_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE Apache Flink Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "Apache Flink Deployment Complete"
+      - "Server       : {{ inventory_hostname }} ({{ ansible_host }})"
+      - "JobManager   : http://{{ ansible_host }}:{{ jobmanager_port }}"
+      - "TaskManager  : Running with {{ taskmanager_slots }} slots"
