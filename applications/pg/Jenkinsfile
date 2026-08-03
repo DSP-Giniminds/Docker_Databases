@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy Postgres') {
+            steps {
+                dir('applications/pg') {
+                    sh 'ansible-playbook -i inventory deploy_pg.yml'
+                }
+            }
+        }
+    }
+}

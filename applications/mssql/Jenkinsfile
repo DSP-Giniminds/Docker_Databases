@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy MSSQL') {
+            steps {
+                dir('applications/mssql') {
+                    sh 'ansible-playbook -i inventory deploy_mssql.yml'
+                }
+            }
+        }
+    }
+}

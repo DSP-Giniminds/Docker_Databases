@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy Kafka') {
+            steps {
+                dir('applications/kafka') {
+                    sh 'ansible-playbook -i inventory deploy_kafka.yml'
+                }
+            }
+        }
+    }
+}

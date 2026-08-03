@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy Oracle') {
+            steps {
+                dir('applications/oracle') {
+                    sh 'ansible-playbook -i inventory deploy_oracle.yml'
+                }
+            }
+        }
+    }
+}

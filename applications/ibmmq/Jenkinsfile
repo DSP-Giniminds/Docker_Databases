@@ -1,0 +1,12 @@
+pipeline {
+    agent any
+    stages {
+        stage('Deploy IBMMQ') {
+            steps {
+                dir('applications/ibmmq') {
+                    sh 'ansible-playbook -i inventory deploy_ibmmq.yml'
+                }
+            }
+        }
+    }
+}
