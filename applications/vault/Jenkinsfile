@@ -1,10 +1,12 @@
 pipeline {
     agent any
     stages {
-        stage('Deploy Vault') {
+        stage('Deploy HashiCorp Vault') {
             steps {
-                dir('applications/vault') {
-                    sh 'ansible-playbook -i inventory deploy_vault.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/vault_deploy && ansible-playbook -i inventory deploy_vault.yml'
+                    '''
                 }
             }
         }
