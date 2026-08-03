@@ -3,8 +3,10 @@ pipeline {
     stages {
         stage('Deploy ELK') {
             steps {
-                dir('applications/elk') {
-                    sh 'ansible-playbook -i inventory deploy_elk.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/Docker_Databases/applications/elk && ansible-playbook -i inventory deploy_elk.yml'
+                    '''
                 }
             }
         }
