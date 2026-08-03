@@ -3,8 +3,10 @@ pipeline {
     stages {
         stage('Deploy MinIO') {
             steps {
-                dir('applications/minio') {
-                    sh 'ansible-playbook -i inventory deploy_minio.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/minio_deploy && ansible-playbook -i inventory deploy_minio.yml'
+                    '''
                 }
             }
         }
