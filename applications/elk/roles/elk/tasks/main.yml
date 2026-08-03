@@ -39,6 +39,7 @@
     -e "xpack.security.enabled=true"
     -e "xpack.security.enrollment.enabled=true"
     -e "xpack.security.http.ssl.enabled=false"
+    -e "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     -e "ELASTIC_PASSWORD={{ elastic_password }}"
     {{ elasticsearch_image }}
   register: elastic_start
@@ -52,21 +53,19 @@
     state: started
 
 - name: "[WAIT] Wait for Elasticsearch API to respond with 200 OK"
-  ansible.builtin.command: >
-    docker exec {{ elasticsearch_container }} 
-    curl -s -o /dev/null -w "%{http_code}" -u elastic:{{ elastic_password }} http://localhost:9200/
+  ansible.builtin.shell: >
+    curl -k -s -o /dev/null -w "%{http_code}" -u elastic:{{ elastic_password }} http://localhost:9200/
   register: es_api_check
   until: es_api_check.stdout == "200"
-  retries: 20
+  retries: 25
   delay: 10
   changed_when: false
 
 - name: "[SECURITY] Configure kibana_system system user password"
-  ansible.builtin.command: >
-    docker exec {{ elasticsearch_container }} 
-    curl -s -X POST -u elastic:{{ elastic_password }} 
-    "http://localhost:9200/_security/user/kibana_system/_password" 
-    -H "Content-Type: application/json" 
+  ansible.builtin.shell: >
+    curl -k -s -X POST -u elastic:{{ elastic_password }}
+    "http://localhost:9200/_security/user/kibana_system/_password"
+    -H "Content-Type: application/json"
     -d '{"password":"{{ kibana_system_password }}"}'
   register: password_set
   retries: 5
