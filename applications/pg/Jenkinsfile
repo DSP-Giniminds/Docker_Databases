@@ -1,10 +1,12 @@
 pipeline {
     agent any
     stages {
-        stage('Deploy Postgres') {
+        stage('Deploy Prometheus and Grafana') {
             steps {
-                dir('applications/pg') {
-                    sh 'ansible-playbook -i inventory deploy_pg.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/pg_deploy && ansible-playbook -i inventory deploy_pg.yml'
+                    '''
                 }
             }
         }
