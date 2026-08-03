@@ -3,8 +3,10 @@ pipeline {
     stages {
         stage('Deploy Kafka') {
             steps {
-                dir('applications/kafka') {
-                    sh 'ansible-playbook -i inventory deploy_kafka.yml'
+                sshagent(['32_creds']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no root@10.10.20.32 'cd /opt/dsp_automation/kafka_deploy && ansible-playbook -i inventory deploy_kafka.yml'
+                    '''
                 }
             }
         }
