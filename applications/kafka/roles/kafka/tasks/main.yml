@@ -1,0 +1,99 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: IMAGE Pull Kafka image
+  ansible.builtin.command: docker pull {{ kafka_image }}
+  changed_when: true
+
+- name: IMAGE Kafka image ready
+  ansible.builtin.debug:
+    msg: "Image {{ kafka_image }} is ready"
+
+- name: NETWORK Check if kafka_network exists
+  ansible.builtin.command: docker network inspect {{ kafka_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create kafka_network
+  ansible.builtin.command: docker network create --driver bridge {{ kafka_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK kafka_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ kafka_network }} is ready"
+
+- name: VOLUME Create Kafka data volume
+  ansible.builtin.command: docker volume create {{ kafka_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: VOLUME Kafka data volume is ready
+  ansible.builtin.debug:
+    msg: "Volume {{ kafka_volume }} is ready"
+
+- name: CLEANUP Remove existing Kafka container
+  ansible.builtin.command: docker rm -f {{ kafka_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start Kafka container (KRaft mode)
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ kafka_container }}
+    --restart always
+    --network {{ kafka_network }}
+    -p {{ kafka_port }}:9092
+    -v {{ kafka_volume }}:/var/lib/kafka/data
+    -e KAFKA_NODE_ID=1
+    -e KAFKA_PROCESS_ROLES=broker,controller
+    -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+    -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://{{ ansible_host }}:9092
+    -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+    -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+    -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+    -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+    -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+    -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+    -e KAFKA_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    {{ kafka_image }}
+  register: kafka_start
+
+- name: DEPLOY Kafka container started
+  ansible.builtin.debug:
+    msg: "Kafka started → ID: {{ kafka_start.stdout[:12] }}"
+
+- name: WAIT for Kafka port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ kafka_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY Check container running
+  ansible.builtin.command: >
+    docker ps --filter name={{ kafka_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE Kafka Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "Kafka Deployment Complete"
+      - "Server      : {{ inventory_hostname }} ({{ ansible_host }})"
+      - "Broker Port : {{ ansible_host }}:{{ kafka_port }}"
+      - "Mode        : KRaft (Zookeeper-less)"

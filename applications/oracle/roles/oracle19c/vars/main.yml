@@ -1,0 +1,10 @@
+---
+oracle_image:         "gvenzl/oracle-xe:21-slim"
+oracle_container:     "oracle-xe"
+oracle_listener_port: 1521
+oracle_em_port:       5500
+oracle_sys_password:  "Oracle1234"
+oracle_pdb:           "XEPDB1"
+oracle_volume:        "oracle_data"
+oracle_start_delay:   30
+oracle_start_timeout: 600

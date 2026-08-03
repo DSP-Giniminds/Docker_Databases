@@ -1,0 +1,115 @@
+---
+- name: PRE-CHECK Verify Docker is running
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: PRE-CHECK Docker is running
+  ansible.builtin.debug:
+    msg: "Docker is running"
+
+- name: IMAGE Pull Prometheus image
+  ansible.builtin.command: docker pull {{ prometheus_image }}
+  changed_when: true
+
+- name: IMAGE Pull Grafana image
+  ansible.builtin.command: docker pull {{ grafana_image }}
+  changed_when: true
+
+- name: NETWORK Check if monitoring_network exists
+  ansible.builtin.command: docker network inspect {{ prometheus_network }}
+  register: network_check
+  changed_when: false
+  failed_when: false
+
+- name: NETWORK Create monitoring_network
+  ansible.builtin.command: docker network create --driver bridge {{ prometheus_network }}
+  when: network_check.rc != 0
+
+- name: NETWORK monitoring_network is ready
+  ansible.builtin.debug:
+    msg: "Network {{ prometheus_network }} is ready"
+
+- name: VOLUME Create Prometheus data volume
+  ansible.builtin.command: docker volume create {{ prometheus_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: VOLUME Create Grafana data volume
+  ansible.builtin.command: docker volume create {{ grafana_volume }}
+  changed_when: true
+  ignore_errors: true
+
+- name: CLEANUP Remove existing Prometheus container
+  ansible.builtin.command: docker rm -f {{ prometheus_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: CLEANUP Remove existing Grafana container
+  ansible.builtin.command: docker rm -f {{ grafana_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: DEPLOY Start Prometheus container
+  ansible.builtin.command: docker run -d --name {{ prometheus_container }} --restart always --network {{ prometheus_network }} -p {{ prometheus_port }}:9090 -v {{ prometheus_volume }}:/prometheus {{ prometheus_image }}
+  register: prometheus_start
+
+- name: DEPLOY Prometheus started
+  ansible.builtin.debug:
+    msg: "Prometheus started → ID: {{ prometheus_start.stdout[:12] }}"
+
+- name: WAIT for Prometheus port 9090
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ prometheus_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY Prometheus health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/-/healthy"
+    method: GET
+    status_code: 200
+  register: prom_health
+  retries: 5
+  delay: 5
+  until: prom_health.status == 200
+
+- name: VERIFY Prometheus is healthy
+  ansible.builtin.debug:
+    msg: "Prometheus is UP and healthy"
+
+- name: DEPLOY Start Grafana container
+  ansible.builtin.command: docker run -d --name {{ grafana_container }} --restart always --network {{ prometheus_network }} -p {{ grafana_port }}:3000 -v {{ grafana_volume }}:/var/lib/grafana -e GF_SECURITY_ADMIN_USER={{ grafana_admin_user }} -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }} {{ grafana_image }}
+  register: grafana_start
+
+- name: DEPLOY Grafana started
+  ansible.builtin.debug:
+    msg: "Grafana started → ID: {{ grafana_start.stdout[:12] }}"
+
+- name: WAIT for Grafana port 3000
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ grafana_port }}"
+    delay: "{{ start_delay }}"
+    timeout: "{{ start_timeout }}"
+    state: started
+
+- name: VERIFY Check all containers running
+  ansible.builtin.command: docker ps --filter name={{ prometheus_container }} --filter name={{ grafana_container }}
+  register: final_check
+  changed_when: false
+
+- name: VERIFY Show container status
+  ansible.builtin.debug:
+    msg: "{{ final_check.stdout_lines }}"
+
+- name: DONE Deployment Summary
+  ansible.builtin.debug:
+    msg:
+      - "Prometheus and Grafana Deployment Complete"
+      - "Prometheus  : http://10.10.20.32:{{ prometheus_port }}"
+      - "Grafana     : http://10.10.20.32:{{ grafana_port }}"
+      - "Grafana Login: {{ grafana_admin_user }} / {{ grafana_admin_password }}"

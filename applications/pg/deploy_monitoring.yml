@@ -1,0 +1,17 @@
+---
+- name: Prometheus and Grafana — Fresh Deployment
+  hosts: monitoring_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg: "Prometheus and Grafana Deployment Starting on 10.10.20.32"
+
+  roles:
+    - role: monitoring
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg: "Prometheus and Grafana Deployment Completed Successfully"

@@ -1,0 +1,19 @@
+---
+# Prometheus
+prometheus_image:      "prom/prometheus:latest"
+prometheus_container:  "prometheus"
+prometheus_port:       "9090"
+prometheus_volume:     "prometheus_data"
+prometheus_network:    "monitoring_network"
+
+# Grafana
+grafana_image:         "grafana/grafana:latest"
+grafana_container:     "grafana"
+grafana_port:          "3000"
+grafana_volume:        "grafana_data"
+grafana_admin_user:    "admin"
+grafana_admin_password: "admin@DSP1234"
+
+# Timings
+start_delay:   10
+start_timeout: 60

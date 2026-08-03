@@ -1,0 +1,21 @@
+---
+# We'll use the official Apache Flink image with Scala 2.12 & Java 11
+flink_image: "flink:1.18.1-scala_2.12-java11"
+
+# Container names
+flink_jobmanager_container: "flink-jobmanager"
+flink_taskmanager_container: "flink-taskmanager"
+
+# External network created by your cp_docker deployment
+docker_network: "giniminds-bridge"
+
+# Port to access the Flink Web UI (Changed to 9081 to avoid conflict with Schema Registry)
+flink_ui_port: 9081
+
+# Confluent Flink-Kafka Connector details to auto-download into the container
+kafka_connector_version: "3.1.0-1.18"
+kafka_connector_url: "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/{{ kafka_connector_version }}/flink-connector-kafka-{{ kafka_connector_version }}.jar"
+
+# Host path to mount connector plugins and persistent storage
+flink_host_volume: "/opt/flink_docker_data"
+

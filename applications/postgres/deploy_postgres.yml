@@ -1,0 +1,26 @@
+---
+- name: PostgreSQL 18 — Fresh Deployment
+  hosts: postgres_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  PostgreSQL 18 Deployment Starting"
+          - "  Target : 10.10.20.32 (ginicoeapp01)"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: postgresql
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  PostgreSQL 18 Deployment Completed Successfully"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="

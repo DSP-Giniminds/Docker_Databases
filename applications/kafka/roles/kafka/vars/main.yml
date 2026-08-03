@@ -1,0 +1,13 @@
+---
+# Kafka / Zookeeper Images & Names
+kafka_image: "apache/kafka:latest"
+kafka_container: "kafka"
+kafka_port: "9093"
+
+# Network & Storage
+kafka_volume: "kafka_data"
+kafka_network: "kafka_network"
+
+# Timings
+start_delay: 10
+start_timeout: 120

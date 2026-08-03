@@ -1,0 +1,27 @@
+---
+- name: Apache Kafka — Fresh Deployment
+  hosts: kafka_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Apache Kafka Deployment Starting"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: kafka
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  Apache Kafka Deployment Completed Successfully"
+          - "  Target : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="

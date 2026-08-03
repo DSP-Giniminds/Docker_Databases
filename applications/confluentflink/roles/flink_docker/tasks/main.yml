@@ -1,0 +1,83 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[DIR] Create host volumes directory"
+  ansible.builtin.file:
+    path: "{{ flink_host_volume }}/lib"
+    state: directory
+    mode: '0777'
+
+- name: "[CONNECTOR] Download Flink-Kafka Connector JAR to host volume"
+  ansible.builtin.get_url:
+    url: "{{ kafka_connector_url }}"
+    dest: "{{ flink_host_volume }}/lib/flink-connector-kafka-{{ kafka_connector_version }}.jar"
+    mode: '0644'
+
+- name: "[IMAGE] Pull Apache Flink Docker Image"
+  ansible.builtin.command: docker pull {{ flink_image }}
+  changed_when: true
+
+- name: "[CLEANUP] Remove existing Flink containers if they exist"
+  ansible.builtin.command: docker rm -f {{ flink_jobmanager_container }} {{ flink_taskmanager_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start Flink JobManager Container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ flink_jobmanager_container }}
+    --restart always
+    --network {{ docker_network }}
+    -p {{ flink_ui_port }}:8081
+    -v {{ flink_host_volume }}/lib/flink-connector-kafka-{{ kafka_connector_version }}.jar:/opt/flink/lib/flink-connector-kafka-{{ kafka_connector_version }}.jar
+    -e FLINK_PROPERTIES="jobmanager.rpc.address: {{ flink_jobmanager_container }}"
+    {{ flink_image }} jobmanager
+  register: jobmanager_start
+
+- name: "[DEPLOY] Start Flink TaskManager Container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ flink_taskmanager_container }}
+    --restart always
+    --network {{ docker_network }}
+    -v {{ flink_host_volume }}/lib/flink-connector-kafka-{{ kafka_connector_version }}.jar:/opt/flink/lib/flink-connector-kafka-{{ kafka_connector_version }}.jar
+    -e FLINK_PROPERTIES="jobmanager.rpc.address: {{ flink_jobmanager_container }}"
+    {{ flink_image }} taskmanager
+  register: taskmanager_start
+
+- name: "[WAIT] Wait for Flink Dashboard Web Port"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ flink_ui_port }}"
+    delay: 5
+    timeout: 60
+    state: started
+
+- name: "[VERIFY] Check running Docker containers"
+  ansible.builtin.command: docker ps --filter name=flink
+  register: docker_check
+  changed_when: false
+
+- name: "[VERIFY] Show active containers"
+  ansible.builtin.debug:
+    msg: "{{ docker_check.stdout_lines }}"
+
+- name: "[DONE] Flink Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  Apache Flink Docker Deployment Complete"
+      - "======================================================="
+      - "  Server       : 10.10.20.32 (ginicoeapp01)"
+      - "  Docker Net   : {{ docker_network }} (Linked with Kafka)"
+      - "  JobManager   : {{ flink_jobmanager_container }} (Port {{ flink_ui_port }})"
+      - "  TaskManager  : {{ flink_taskmanager_container }}"
+      - "  Kafka Conn.  : Mounted into /opt/flink/lib/"
+      - "  -----------------------------------------------------"
+      - "  To connect Flink to your local Kafka brokers, use:"
+      - "  broker-1:9092, broker-2:9093, broker-3:9094"
+      - "======================================================="

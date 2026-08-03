@@ -1,0 +1,10 @@
+---
+mssql_image:        "mcr.microsoft.com/mssql/server:2022-latest"
+mssql_container:    "mssql_prod"
+mssql_port:         "1433"
+mssql_sa_password:  "RootPassword@123"
+mssql_pid:          "Express"
+mssql_volume:       "mssql_data"
+mssql_network:      "mssql_network"
+mssql_start_delay:   20
+mssql_start_timeout: 180

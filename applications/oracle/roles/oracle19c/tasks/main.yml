@@ -1,0 +1,86 @@
+---
+- name: "[PRE-CHECK] Verify Docker is running"
+  ansible.builtin.command: docker info
+  register: docker_info
+  changed_when: false
+  failed_when: docker_info.rc != 0
+
+- name: "[PRE-CHECK] Docker is running"
+  ansible.builtin.debug:
+    msg: "Docker is running"
+
+- name: "[IMAGE] Pull Oracle XE image"
+  ansible.builtin.command: docker pull {{ oracle_image }}
+  register: image_pull
+  changed_when: true
+
+- name: "[IMAGE] Oracle image pulled successfully"
+  ansible.builtin.debug:
+    msg: "Oracle image {{ oracle_image }} is ready"
+
+- name: "[VOLUME] Create Oracle data volume"
+  ansible.builtin.command: docker volume create {{ oracle_volume }}
+  register: volume_create
+  changed_when: true
+
+- name: "[VOLUME] Data volume created"
+  ansible.builtin.debug:
+    msg: "Volume {{ oracle_volume }} is ready"
+
+- name: "[CLEANUP] Remove existing Oracle container if any"
+  ansible.builtin.command: docker rm -f {{ oracle_container }}
+  ignore_errors: true
+  changed_when: true
+
+- name: "[DEPLOY] Start Oracle XE container"
+  ansible.builtin.command: >
+    docker run -d
+    --name {{ oracle_container }}
+    --restart unless-stopped
+    -p {{ oracle_listener_port }}:1521
+    -p {{ oracle_em_port }}:5500
+    -e ORACLE_PASSWORD={{ oracle_sys_password }}
+    -v {{ oracle_volume }}:/opt/oracle/oradata
+    {{ oracle_image }}
+  register: oracle_start
+
+- name: "[DEPLOY] Container started"
+  ansible.builtin.debug:
+    msg: "Oracle container started → ID: {{ oracle_start.stdout[:12] }}"
+
+- name: "[WAIT] Wait for Oracle port 1521"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ oracle_listener_port }}"
+    delay: "{{ oracle_start_delay }}"
+    timeout: "{{ oracle_start_timeout }}"
+    state: started
+
+- name: "[WAIT] Port 1521 is ready"
+  ansible.builtin.debug:
+    msg: "Oracle port 1521 is open"
+
+- name: "[VERIFY] Check Oracle container is running"
+  ansible.builtin.command: docker ps --filter name={{ oracle_container }} --format "{{ '{{' }}.Names{{ '}}' }} {{ '{{' }}.Status{{ '}}' }}"
+  register: container_check
+  changed_when: false
+
+- name: "[VERIFY] Show container status"
+  ansible.builtin.debug:
+    msg: "{{ container_check.stdout }}"
+
+- name: "[DONE] Oracle XE Deployment Summary"
+  ansible.builtin.debug:
+    msg:
+      - "======================================================="
+      - "  Oracle XE Deployment Complete"
+      - "  Server    : {{ inventory_hostname }}"
+      - "  Container : {{ oracle_container }}"
+      - "  Image     : {{ oracle_image }}"
+      - "  Port      : {{ oracle_listener_port }}"
+      - "  PDB       : {{ oracle_pdb }}"
+      - "  Password  : {{ oracle_sys_password }}"
+      - "-------------------------------------------------------"
+      - "  Connect:"
+      - "  docker exec -it {{ oracle_container }} sqlplus sys/{{ oracle_sys_password }}@localhost:1521/{{ oracle_pdb }} as sysdba"
+      - "======================================================="

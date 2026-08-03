@@ -1,0 +1,26 @@
+---
+- name: MS SQL Server 2022 — Fresh Deployment
+  hosts: mssql_servers
+  become: true
+
+  pre_tasks:
+    - name: Start Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  MS SQL Server 2022 Deployment Starting"
+          - "  Target : 10.10.20.32 (ginicoeapp01)"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
+
+  roles:
+    - role: mssql
+
+  post_tasks:
+    - name: Complete Banner
+      ansible.builtin.debug:
+        msg:
+          - "======================================================="
+          - "  MS SQL Server 2022 Deployment Completed Successfully"
+          - "  Time   : {{ ansible_date_time.iso8601 }}"
+          - "======================================================="
