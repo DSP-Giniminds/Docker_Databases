@@ -59,7 +59,7 @@
 
 - name: WAIT for JobManager port
   ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
+    host: "127.0.0.1"
     port: "{{ jobmanager_port }}"
     delay: "{{ start_delay }}"
     timeout: "{{ start_timeout }}"
