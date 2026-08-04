@@ -9,20 +9,20 @@
   ansible.builtin.debug:
     msg: "Docker is running on {{ inventory_hostname }}"
 
-- name: LOGIN to SAG Container Registry
-  ansible.builtin.command: >
-    docker login {{ sag_registry }}
-    -u {{ sag_username }}
-    -p {{ sag_password }}
-  changed_when: true
+# - name: LOGIN to SAG Container Registry
+#   ansible.builtin.command: >
+#     docker login {{ sag_registry }}
+#     -u {{ sag_username }}
+#     -p {{ sag_password }}
+#   changed_when: true
 
-- name: IMAGE Pull webMethods IS image
-  ansible.builtin.command: docker pull {{ wm_image }}
-  changed_when: true
+# - name: IMAGE Pull webMethods IS image
+#   ansible.builtin.command: docker pull {{ wm_image }}
+#   changed_when: true
 
-- name: IMAGE webMethods image ready
+- name: IMAGE webMethods image ready (Using local image)
   ansible.builtin.debug:
-    msg: "Image {{ wm_image }} is ready"
+    msg: "Using local image: ibmwebmethods.azurecr.io/webmethods-integrationserver:11.1"
 
 - name: NETWORK Check if webmethods_network exists
   ansible.builtin.command: docker network inspect {{ wm_network }}
@@ -59,7 +59,7 @@
     -v {{ wm_volume }}:/opt/softwareag/IntegrationServer/instances/default
     -v {{ wm_license_file }}:/opt/softwareag/IntegrationServer/config/licenseKey.xml:ro
     -e SAG_IS_ADMINISTRATOR_PASSWORD={{ wm_admin_password }}
-    {{ wm_image }}
+    ibmwebmethods.azurecr.io/webmethods-integrationserver:11.1
   register: wm_start
 
 - name: DEPLOY webMethods container started
