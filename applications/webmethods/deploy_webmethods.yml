@@ -1,7 +1,7 @@
 ---
 - name: webMethods Integration Server — Fresh Deployment
   hosts: webmethods_servers
-  become: true
+  become: false
 
   pre_tasks:
     - name: Start Banner
