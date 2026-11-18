@@ -1,7 +1,13 @@
-stage('Deploy webMethods IS') {
-    steps {
-        dir('applications/webmethods') {
-            sh 'ansible-playbook -i inventory deploy_webmethods.yml'
+pipeline {
+    agent any
+
+    stages {
+        stage('Deploy webMethods IS') {
+            steps {
+                dir('applications/webmethods') {
+                    sh 'ansible-playbook -i inventory deploy_webmethods.yml'
+                }
+            }
         }
     }
 }
